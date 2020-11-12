@@ -1,0 +1,95 @@
+#!/bin/zsh
+################################################################################
+# fileVaultListener
+# Created 21 Sept 2020 by J Samuel Clark
+################################################################################
+# Framework variables
+################################################################################
+orgName="orgName" #Change the name of your organization here
+framework="/usr/local/$orgName" # Change the path of your org framework here
+
+################################################################################
+# Set logging
+################################################################################
+if [ ! -d /var/log/"$orgName" ]; then
+	/bin/mkdir "/var/log/$orgName"
+fi
+logFile="/var/log/$orgName/filevault-listener.log"
+exec 1>>$logFile 2>&1
+
+################################################################################
+# Global Variables
+################################################################################
+#System process variables
+loggedInUser=$(/usr/bin/stat -f%Su /dev/console)
+daemon="/Library/LaunchDaemons/com.$orgName.fileVaultListener.plist"
+daemonLabel="com.$orgName.fileVaultListener"
+
+################################################################################
+# Defining Functions
+################################################################################
+function addDate() {
+#Adds date to line output
+	while IFS= read -r line; do
+		echo "$(date) $line"
+	done
+}
+
+function waitForJSS() {
+#Waits for an active JSS connection before continuing
+	jssAvailable=$(/usr/local/bin/jamf checkJssConnection | grep "available" )
+	until [[ -n $jssAvailable ]]; do
+		echo "The JSS is unavailable, waiting" | addDate >> "$logFile"
+		sleep 2
+		$jssAvailable=$(/usr/local/bin/jamf checkJssConnection | grep "available" )
+	done
+	echo "The JSS is available, moving on" | addDate >> "$logFile"
+}
+
+function runRecon () {
+#Runs a Jamf Recon
+	waitForJSS
+	/usr/local/bin/jamf recon
+}
+
+function removeListener () {
+#Removes the listener framework
+	echo "Removing the fileVaultListener" | addDate >> "$logFile"
+
+	#Removing files and unloading daemon
+	/bin/rm -r "$daemon"
+	/bin/rm -r "$framework/bin/fileVaultListener"
+	/bin/launchctl remove "$daemonLabel"
+}
+
+################################################################################
+# Begin - HOLD ONTO BUTTS
+################################################################################
+# Check to make sure user is logged in otherwise exit
+[[ -z "$loggedInUser" ]] && echo "User not logged in; exiting." && exit 0
+
+#Checking for deferred status
+if /usr/bin/fdesetup status | /usr/bin/grep "Deferred"; then
+	echo "Waiting for user to enable FileVault via login" | addDate >> "$logFile"
+	exit 0
+
+#Checking to see if the computer is encrypting
+elif /usr/bin/fdesetup status | /usr/bin/grep "Encryption"; then
+	exit 0
+
+#Checking to see if encryption is on and running Jamf recon
+elif /usr/bin/fdesetup status | /usr/bin/grep "On"; then
+	echo "Computer is encrypted, running recon" | addDate >> "$logFile"
+	runRecon
+
+	#Removing listener framework
+	removeListener
+	exit 0
+
+#If the Mac is not encrypted
+elif /usr/bin/fdesetup status | /usr/bin/grep "Off"; then
+	echo "Policy to enable FileVault did not complete, something went wrong. Ignore if this is the first time you're seeing this message." | addDate >> "$logFile"
+	exit 1
+fi
+
+exit 0
