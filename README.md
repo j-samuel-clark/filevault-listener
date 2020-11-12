@@ -3,9 +3,14 @@ A tool which checks for real-time status of the FileVault process and submits a 
 
 ## How filevault-listener works
 This tool is designed to be installed as a component of a Jamf policy to enable FileVault encryption. The build of this project is designed to work within Jamf's Composer application. 
+### Included Scripts
+[`/usr/local/orgName/bin/fileVaultListener`](https://github.com/j-samuel-clark/filevault-listener/blob/main/filevault-listener/ROOT/usr/local/orgName/bin/fileVaultListener)
+
+[`/Scripts/postinstall`](https://github.com/j-samuel-clark/filevault-listener/blob/main/filevault-listener/Scripts/postinstall)
 
 ### Installed payloads:
-`/usr/local/orgname/bin/fileVaultListener`
+`/usr/local/orgName/bin/fileVaultListener`
+
 `/Library/LaunchDaemons/com.orgName.fileVaultListener.plist`
 
 ### What the payloads do:
